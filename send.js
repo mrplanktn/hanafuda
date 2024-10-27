@@ -1,40 +1,53 @@
 require('dotenv').config();
 const { ethers } = require('ethers');
 
-// Mengambil variabel dari file .env
 const PRIVATE_KEY = process.env.PRIVATE_KEY;
 const RPC_URL = process.env.RPC_URL;
 const RECIPIENT_ADDRESS = process.env.RECIPIENT_ADDRESS;
 const AMOUNT_TO_SEND = process.env.AMOUNT_TO_SEND;
+const MAX_TRANSACTIONS_PER_HOUR = 200; // Batas transaksi per jam
 
-// Membuat provider menggunakan URL RPC untuk Base Network
+// Membuat provider dan wallet
 const provider = new ethers.JsonRpcProvider(RPC_URL);
-
-// Membuat wallet dari kunci pribadi dan provider
 const wallet = new ethers.Wallet(PRIVATE_KEY, provider);
 
+// Fungsi untuk mengirim satu transaksi
 async function sendTransaction() {
   try {
-    // Menentukan jumlah token yang akan dikirim (dalam format ether)
     const amount = ethers.parseEther(AMOUNT_TO_SEND);
 
-    // Menyusun data transaksi
     const tx = {
       to: RECIPIENT_ADDRESS,
       value: amount,
     };
 
-    // Mengirim transaksi
     const transaction = await wallet.sendTransaction(tx);
-
     console.log(`Transaksi berhasil dikirim! Hash: ${transaction.hash}`);
 
-    // Menunggu konfirmasi transaksi
     await transaction.wait();
-    console.log(`Transaksi berhasil dikonfirmasi! Hash: ${transaction.hash}`);
+    console.log(`Transaksi dikonfirmasi! Hash: ${transaction.hash}`);
   } catch (error) {
     console.error("Gagal mengirim transaksi:", error);
   }
 }
 
-sendTransaction();
+// Fungsi untuk menjadwalkan pengiriman transaksi
+function scheduleTransactions() {
+  let transactionCount = 0;
+
+  const intervalId = setInterval(async () => {
+    if (transactionCount >= MAX_TRANSACTIONS_PER_HOUR) {
+      console.log("Batas transaksi per jam tercapai, menghentikan pengiriman.");
+      clearInterval(intervalId);
+      return;
+    }
+
+    await sendTransaction();
+    transactionCount++;
+    console.log(`Transaksi ke-${transactionCount} dikirim.`);
+
+  }, 3600 / MAX_TRANSACTIONS_PER_HOUR * 1000); // Menghitung jeda waktu dalam milidetik
+}
+
+// Memulai pengiriman berkala
+scheduleTransactions();
